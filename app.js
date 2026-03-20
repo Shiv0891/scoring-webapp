@@ -294,6 +294,7 @@ function show(id){$(id).classList.remove('hidden')}
 function hide(id){$(id).classList.add('hidden')}
 function showModal(id){$(id).style.display='flex';$(id).classList.remove('hidden')}
 function hideModal(id){$(id).style.display='';$(id).classList.add('hidden')}
+function buzz(ms){if(navigator.vibrate)navigator.vibrate(ms||15)}
 
 function render(){
   const s=engine.state, e=engine;
@@ -510,13 +511,13 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   // Scoring buttons
   document.querySelectorAll('[data-runs]').forEach(btn=>{
-    btn.onclick=()=>{engine.addRuns(parseInt(btn.dataset.runs));render()}
+    btn.onclick=()=>{buzz();engine.addRuns(parseInt(btn.dataset.runs));render()}
   });
-  document.querySelector('[data-dot]').onclick=()=>{engine.dotBall();render()};
+  document.querySelector('[data-dot]').onclick=()=>{buzz();engine.dotBall();render()};
 
   // Wicket
   let runOutRunsScored=0;
-  $('btn-wicket').onclick=()=>showModal('modal-wicket-type');
+  $('btn-wicket').onclick=()=>{buzz(30);showModal('modal-wicket-type')};
   document.querySelectorAll('[data-wicket-type]').forEach(btn=>{
     btn.onclick=()=>{
       const type=btn.dataset.wicketType;

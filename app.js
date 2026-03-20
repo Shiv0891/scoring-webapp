@@ -299,6 +299,16 @@ function buzz(ms){if(navigator.vibrate)navigator.vibrate(ms||15)}
 function render(){
   const s=engine.state, e=engine;
 
+  // Header info
+  if(s.matchStarted){
+    hide('header-title');show('header-matchup');show('header-batting-label');
+    $('header-matchup').textContent=s.team1Name+' vs '+s.team2Name;
+    const battingTeam=s.currentInning===1?s.team1Name:s.team2Name;
+    $('header-batting-label').textContent=battingTeam+' - Batting - Inning '+s.currentInning;
+  } else {
+    show('header-title');hide('header-matchup');hide('header-batting-label');
+  }
+
   // Section visibility
   if(!s.matchStarted&&!s.matchResult){
     show('match-setup');hide('live-scoring');hide('match-result');
@@ -332,16 +342,6 @@ function render(){
     }
     if(e.canDeclare)show('btn-declare-from-bowler');else hide('btn-declare-from-bowler');
   } else hide('new-bowler-prompt');
-
-  // Header info
-  if(s.matchStarted){
-    hide('header-title');show('header-matchup');show('header-batting-label');
-    $('header-matchup').textContent=s.team1Name+' vs '+s.team2Name;
-    const battingTeam=s.currentInning===1?s.team1Name:s.team2Name;
-    $('header-batting-label').textContent=battingTeam+' - Batting - Inning '+s.currentInning;
-  } else {
-    show('header-title');hide('header-matchup');hide('header-batting-label');
-  }
 
   // Score card
   $('score-display').textContent=s.runs+'/'+s.wickets;

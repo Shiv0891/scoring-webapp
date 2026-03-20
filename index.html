@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a73e8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Cricket Scorer</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+<div id="app">
+
+  <div id="app-header">🏏 <span id="header-text">Cricket Scorer</span></div>
+
+  <!-- Match Setup -->
+  <div id="match-setup" class="card">
+    <h3 id="setup-title">Match Setup</h3>
+    <div id="setup-team-fields">
+      <input type="text" id="setup-team1" placeholder="Batting Team">
+      <input type="text" id="setup-team2" placeholder="Bowling Team">
+    </div>
+    <input type="text" id="setup-striker" placeholder="Striker">
+    <input type="text" id="setup-nonstriker" placeholder="Non-Striker">
+    <input type="text" id="setup-bowler" placeholder="Bowler">
+    <button id="btn-start-match" class="btn btn-primary btn-full">Start Match</button>
+  </div>
+
+  <!-- Match Result -->
+  <div id="match-result" class="hidden">
+    <div class="result-emoji">🏏</div>
+    <div id="result-text" class="result-card"></div>
+    <button id="btn-new-match" class="btn btn-primary btn-full mt-12">New Match</button>
+    <button id="btn-result-summary" class="btn btn-secondary btn-full mt-8">📋 Summary</button>
+  </div>
+
+  <!-- Live Scoring -->
+  <div id="live-scoring" class="hidden">
+
+    <div id="new-batsman-prompt" class="prompt-card hidden">
+      <h3>New Batsman</h3>
+      <input type="text" id="input-new-batsman" placeholder="Batsman Name">
+      <button id="btn-confirm-batsman" class="btn btn-primary btn-full mt-8">Confirm</button>
+    </div>
+
+    <div id="new-bowler-prompt" class="prompt-card hidden">
+      <h3>New Over — Select Bowler</h3>
+      <input type="text" id="input-new-bowler" placeholder="Bowler Name">
+      <div id="existing-bowlers-list"></div>
+      <button id="btn-confirm-bowler" class="btn btn-primary btn-full mt-8">Confirm</button>
+      <button id="btn-declare-from-bowler" class="btn btn-outline btn-full mt-8 hidden">📢 Declare Innings</button>
+    </div>
+
+    <div id="score-card" class="card">
+      <div id="score-display">0/0</div>
+      <div id="overs-display">Overs: 0.0</div>
+      <div id="chase-info" class="text-center"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Runs</div>
+      <div id="scoring-buttons" class="btn-grid">
+        <button class="btn btn-secondary" data-dot>0</button>
+        <button class="btn btn-primary" data-runs="1">+1</button>
+        <button class="btn btn-primary" data-runs="2">+2</button>
+        <button class="btn btn-primary" data-runs="3">+3</button>
+        <button class="btn btn-success" data-runs="4">+4</button>
+        <button class="btn btn-purple" data-runs="6">+6</button>
+      </div>
+    </div>
+
+    <button id="btn-wicket" class="btn btn-wicket mt-12">WICKET</button>
+
+    <div class="card">
+      <div class="section-title">Extras</div>
+      <div class="btn-grid btn-grid-2col">
+        <button id="btn-wide" class="btn btn-outline">Wide</button>
+        <button id="btn-noball" class="btn btn-outline">No Ball</button>
+        <button id="btn-bye" class="btn btn-outline">Bye</button>
+        <button id="btn-legbye" class="btn btn-outline">Leg Bye</button>
+      </div>
+    </div>
+
+    <div id="over-summary" class="card">
+      <div class="over-header">
+        <span id="over-title" class="section-title">Over 1</span>
+        <span id="over-balls-remaining" class="over-remaining"></span>
+      </div>
+      <div id="over-chips" class="over-chips"></div>
+      <div id="over-runs" class="over-runs-text"></div>
+    </div>
+
+    <div id="player-stats" class="card">
+      <div class="stats-header">
+        <span class="section-title">Batting</span>
+        <button id="btn-swap" class="btn btn-secondary swap-btn">🔄 Swap</button>
+      </div>
+      <table id="batting-table" class="stats-table">
+        <thead><tr><th>Batsman</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="section-title mt-12">Bowling</div>
+      <table id="bowling-table" class="stats-table">
+        <thead><tr><th>Bowler</th><th>O</th><th>M</th><th>R</th><th>W</th><th>Eco</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="match-controls">
+      <div class="controls-row">
+        <button id="btn-undo" class="btn btn-secondary">Undo</button>
+        <button id="btn-reset" class="btn btn-danger">Reset</button>
+        <button id="btn-declare" class="btn btn-primary">Declare</button>
+      </div>
+      <button id="btn-summary" class="btn btn-secondary btn-full">📋 Summary</button>
+    </div>
+  </div>
+
+  <!-- Modals -->
+  <div id="modal-wide" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h3>Wide Ball</h3>
+      <p class="modal-subtitle">1 run added. How many additional runs?</p>
+      <div class="modal-buttons">
+        <button class="btn btn-primary" data-wide="0">+0</button>
+        <button class="btn btn-primary" data-wide="1">+1</button>
+        <button class="btn btn-primary" data-wide="2">+2</button>
+        <button class="btn btn-primary" data-wide="3">+3</button>
+        <button class="btn btn-primary" data-wide="4">+4</button>
+        <button class="btn btn-primary" data-wide="6">+6</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-noball-hit" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h3>No Ball</h3>
+      <p class="modal-subtitle">Did the batsman hit the ball?</p>
+      <div class="modal-buttons">
+        <button id="btn-nb-no" class="btn btn-outline">No</button>
+        <button id="btn-nb-yes" class="btn btn-primary">Yes</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-noball-runs" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h3>No Ball</h3>
+      <p id="nb-runs-subtitle" class="modal-subtitle"></p>
+      <div class="modal-buttons">
+        <button class="btn btn-primary" data-nb="0">+0</button>
+        <button class="btn btn-primary" data-nb="1">+1</button>
+        <button class="btn btn-primary" data-nb="2">+2</button>
+        <button class="btn btn-primary" data-nb="3">+3</button>
+        <button class="btn btn-primary" data-nb="4">+4</button>
+        <button class="btn btn-primary" data-nb="6">+6</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-bye" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h3>Bye</h3>
+      <p class="modal-subtitle">How many byes?</p>
+      <div class="modal-buttons">
+        <button class="btn btn-primary" data-bye="1">+1</button>
+        <button class="btn btn-primary" data-bye="2">+2</button>
+        <button class="btn btn-primary" data-bye="3">+3</button>
+        <button class="btn btn-primary" data-bye="4">+4</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-legbye" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h3>Leg Bye</h3>
+      <p class="modal-subtitle">How many leg byes?</p>
+      <div class="modal-buttons">
+        <button class="btn btn-primary" data-lb="1">+1</button>
+        <button class="btn btn-primary" data-lb="2">+2</button>
+        <button class="btn btn-primary" data-lb="3">+3</button>
+        <button class="btn btn-primary" data-lb="4">+4</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-summary" class="modal-overlay hidden">
+    <div class="modal-content modal-fullscreen">
+      <div class="modal-top-bar"><h3>Match Summary</h3><div><button id="btn-download-pdf" class="btn btn-primary btn-pdf">📥 PDF</button><button id="btn-close-summary" class="btn-close">&times;</button></div></div>
+      <div id="summary-content"></div>
+    </div>
+  </div>
+
+  <div id="modal-wicket-type" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h3>Wicket Type</h3>
+      <p class="modal-subtitle">How was the batsman dismissed?</p>
+      <div class="modal-buttons modal-buttons-col">
+        <button class="btn btn-danger" data-wicket-type="bowled">Bowled</button>
+        <button class="btn btn-danger" data-wicket-type="caught">Caught Out</button>
+        <button class="btn btn-danger" data-wicket-type="lbw">LBW</button>
+        <button class="btn btn-danger" data-wicket-type="runout">Run Out</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-runout-runs" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h3>Run Out</h3>
+      <p class="modal-subtitle">How many runs did the striker score before the run out?</p>
+      <div class="modal-buttons">
+        <button class="btn btn-primary" data-ro-runs="0">0</button>
+        <button class="btn btn-primary" data-ro-runs="1">1</button>
+        <button class="btn btn-primary" data-ro-runs="2">2</button>
+        <button class="btn btn-primary" data-ro-runs="3">3</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-runout-who" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h3>Run Out</h3>
+      <p class="modal-subtitle">Which batsman is out?</p>
+      <div class="modal-buttons modal-buttons-col">
+        <button id="btn-runout-striker" class="btn btn-danger"></button>
+        <button id="btn-runout-nonstriker" class="btn btn-danger"></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-reset" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h3>Reset Match</h3>
+      <p class="modal-subtitle">Are you sure? This cannot be undone.</p>
+      <div class="modal-buttons">
+        <button id="btn-reset-cancel" class="btn btn-secondary">Cancel</button>
+        <button id="btn-reset-yes" class="btn btn-danger">Reset</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="app.js"></script>
+<script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+</body>
+</html>

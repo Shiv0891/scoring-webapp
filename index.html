@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#1a73e8">
+  <meta name="theme-color" content="#0f1923">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Cricket Scorer</title>
@@ -15,7 +18,11 @@
 <body>
 <div id="app">
 
-  <div id="app-header">🏏 <span id="header-text">Cricket Scorer</span></div>
+  <div id="app-header">
+    <div id="header-title">🏏 Cricket Scorer</div>
+    <div id="header-matchup" class="hidden"></div>
+    <div id="header-batting-label" class="hidden"></div>
+  </div>
 
   <!-- Match Setup -->
   <div id="match-setup" class="card">

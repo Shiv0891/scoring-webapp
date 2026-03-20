@@ -298,10 +298,6 @@ function hideModal(id){$(id).style.display='';$(id).classList.add('hidden')}
 function render(){
   const s=engine.state, e=engine;
 
-  // Header
-  const team=s.currentInning===1?s.team1Name:s.team2Name;
-  $('header-text').textContent=team+' — Inning '+s.currentInning;
-
   // Section visibility
   if(!s.matchStarted&&!s.matchResult){
     show('match-setup');hide('live-scoring');hide('match-result');
@@ -327,7 +323,7 @@ function render(){
     show('new-bowler-prompt');$('input-new-bowler').value='';
     const list=$('existing-bowlers-list');list.innerHTML='';
     if(s.bowlersList.length>0){
-      const lbl=document.createElement('p');lbl.textContent='Or select previous bowler:';lbl.style.fontSize='.8rem';lbl.style.color='#888';lbl.style.margin='6px 0 4px';list.appendChild(lbl);
+      const lbl=document.createElement('p');lbl.textContent='Or select previous bowler:';lbl.style.fontSize='.8rem';lbl.style.color='#5a6a7a';lbl.style.margin='6px 0 4px';list.appendChild(lbl);
       s.bowlersList.forEach(b=>{
         const btn=document.createElement('button');btn.className='btn btn-outline existing-bowler-btn';btn.textContent=b.name;
         btn.onclick=()=>{engine.setNewBowler(b.name);render()};list.appendChild(btn);
@@ -335,6 +331,16 @@ function render(){
     }
     if(e.canDeclare)show('btn-declare-from-bowler');else hide('btn-declare-from-bowler');
   } else hide('new-bowler-prompt');
+
+  // Header info
+  if(s.matchStarted){
+    hide('header-title');show('header-matchup');show('header-batting-label');
+    $('header-matchup').textContent=s.team1Name+' vs '+s.team2Name;
+    const battingTeam=s.currentInning===1?s.team1Name:s.team2Name;
+    $('header-batting-label').textContent=battingTeam+' - Batting - Inning '+s.currentInning;
+  } else {
+    show('header-title');hide('header-matchup');hide('header-batting-label');
+  }
 
   // Score card
   $('score-display').textContent=s.runs+'/'+s.wickets;

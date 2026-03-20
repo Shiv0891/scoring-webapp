@@ -3,8 +3,8 @@
   "short_name": "Cricket",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#f5f5f5",
-  "theme_color": "#1a73e8",
+  "background_color": "#0f1923",
+  "theme_color": "#0f1923",
   "description": "Advanced cricket scoring app with full match tracking",
   "icons": [
     {

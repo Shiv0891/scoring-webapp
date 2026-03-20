@@ -1,4 +1,4 @@
-const CACHE = 'cricket-scorer-v2';
+const CACHE = 'cricket-scorer-v3';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.json'];
 
 self.addEventListener('install', e => {

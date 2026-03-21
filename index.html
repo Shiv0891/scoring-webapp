@@ -35,6 +35,7 @@
     <input type="text" id="setup-nonstriker" placeholder="Non-Striker">
     <input type="text" id="setup-bowler" placeholder="Bowler">
     <button id="btn-start-match" class="btn btn-primary btn-full">Start Match</button>
+    <button id="btn-match-history" class="btn btn-secondary btn-full mt-8">📜 Match History</button>
   </div>
 
   <!-- Match Result -->
@@ -120,10 +121,10 @@
     <div id="match-controls">
       <div class="controls-row">
         <button id="btn-undo" class="btn btn-secondary">Undo</button>
-        <button id="btn-reset" class="btn btn-danger">Reset</button>
         <button id="btn-declare" class="btn btn-primary">Declare</button>
       </div>
       <button id="btn-summary" class="btn btn-secondary btn-full">📋 Summary</button>
+      <button id="btn-push-save" class="btn btn-outline btn-full mt-8">💾 Push to Saved Matches</button>
     </div>
   </div>
 
@@ -239,14 +240,10 @@
     </div>
   </div>
 
-  <div id="modal-reset" class="modal-overlay hidden">
-    <div class="modal-content">
-      <h3>Reset Match</h3>
-      <p class="modal-subtitle">Are you sure? This cannot be undone.</p>
-      <div class="modal-buttons">
-        <button id="btn-reset-cancel" class="btn btn-secondary">Cancel</button>
-        <button id="btn-reset-yes" class="btn btn-danger">Reset</button>
-      </div>
+  <div id="modal-history" class="modal-overlay hidden">
+    <div class="modal-content modal-fullscreen">
+      <div class="modal-top-bar"><h3>Match History</h3><button id="btn-close-history" class="btn-close">&times;</button></div>
+      <div id="history-content"></div>
     </div>
   </div>
 

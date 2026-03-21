@@ -6,7 +6,7 @@ class ScoringEngine {
   }
   _freshState() {
     return {
-      runs:0, wickets:0, balls:0, currentInning:1,
+      matchId:null, runs:0, wickets:0, balls:0, currentInning:1,
       inning1Runs:0, inning1Wickets:0, hasInning1Score:false, inning1Balls:0,
       inning1BatsmenList:[], inning1BowlersList:[],
       inning1Byes:0, inning1LegByes:0, inning1Wides:0, inning1NoBalls:0,
@@ -71,7 +71,7 @@ class ScoringEngine {
     const b2={name:nonStriker,runs:0,ballsFaced:0,fours:0,sixes:0,isOut:false};
     const bw={name:bowler,runsConceded:0,ballsBowled:0,wicketsTaken:0,wides:0,noBalls:0,maidens:0};
     this.state=this._freshState();
-    Object.assign(this.state,{striker:b1,nonStriker:b2,currentBowler:bw,batsmenList:[this._dc(b1),this._dc(b2)],bowlersList:[this._dc(bw)],matchStarted:true,team1Name:t1||'Team 1',team2Name:t2||'Team 2'});
+    Object.assign(this.state,{matchId:Date.now()+'-'+Math.random().toString(36).slice(2,8),striker:b1,nonStriker:b2,currentBowler:bw,batsmenList:[this._dc(b1),this._dc(b2)],bowlersList:[this._dc(bw)],matchStarted:true,team1Name:t1||'Team 1',team2Name:t2||'Team 2'});
   }
 
   swapStrike(){const t=this.state.striker;this.state.striker=this.state.nonStriker;this.state.nonStriker=t}
@@ -285,6 +285,95 @@ class ScoringEngine {
   }
 }
 
+// ==================== PERSISTENCE ====================
+const STORAGE_KEY = 'cricket_scorer_live';
+const HISTORY_KEY = 'cricket_scorer_history';
+const MAX_HISTORY = 50;
+
+function saveState(){
+  try{
+    localStorage.setItem(STORAGE_KEY,JSON.stringify({state:engine.state,stateHistory:engine.stateHistory}));
+  }catch(e){}
+  syncLiveMatchToHistory();
+}
+
+function loadState(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw)return false;
+    const data=JSON.parse(raw);
+    if(data&&data.state){engine.state=data.state;engine.stateHistory=data.stateHistory||[];return true}
+  }catch(e){}
+  return false;
+}
+
+function clearSavedState(){
+  try{localStorage.removeItem(STORAGE_KEY)}catch(e){}
+}
+
+function _buildHistoryEntry(s){
+  return {
+    matchId:s.matchId||null,
+    date:new Date().toISOString(),
+    team1:s.team1Name,team2:s.team2Name,
+    inning1Runs:s.inning1Runs,inning1Wickets:s.inning1Wickets,inning1Balls:s.inning1Balls,
+    inning2Runs:s.runs,inning2Wickets:s.wickets,inning2Balls:s.balls,
+    result:s.matchResult,
+    inning1BatsmenList:s.inning1BatsmenList,inning1BowlersList:s.inning1BowlersList,
+    batsmenList:s.batsmenList,bowlersList:s.bowlersList,
+    currentInning:s.currentInning,maxOvers:s.maxOvers,
+    inning1Byes:s.inning1Byes,inning1LegByes:s.inning1LegByes,
+    inning1Wides:s.inning1Wides,inning1NoBalls:s.inning1NoBalls,
+    byes:s.byes,legByes:s.legByes,totalWides:s.totalWides,totalNoBalls:s.totalNoBalls
+  };
+}
+
+function syncLiveMatchToHistory(){
+  const s=engine.state;
+  if(!s.matchStarted||!s.matchId)return;
+  try{
+    const hist=JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');
+    const entry=_buildHistoryEntry(s);
+    if(entry.result&&entry.result!=='In Progress'){
+      delete entry.fullState;
+    } else {
+      entry.result='In Progress';
+      entry.fullState=JSON.parse(JSON.stringify({state:s,stateHistory:engine.stateHistory}));
+    }
+    const idx=hist.findIndex(h=>h.matchId===s.matchId);
+    if(idx>=0){
+      entry.date=hist[idx].date;
+      hist[idx]=entry;
+    } else {
+      hist.unshift(entry);
+      if(hist.length>MAX_HISTORY)hist.length=MAX_HISTORY;
+    }
+    localStorage.setItem(HISTORY_KEY,JSON.stringify(hist));
+  }catch(e){}
+}
+
+function removeLiveMatchFromHistory(){
+  const s=engine.state;
+  if(!s.matchId)return;
+  try{
+    const hist=JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');
+    const idx=hist.findIndex(h=>h.matchId===s.matchId);
+    if(idx>=0){hist.splice(idx,1);localStorage.setItem(HISTORY_KEY,JSON.stringify(hist))}
+  }catch(e){}
+}
+
+function pushToSavedMatches(){
+  const s=engine.state;
+  if(!s.matchStarted)return;
+  syncLiveMatchToHistory();
+  engine.reset();
+  clearSavedState();
+}
+
+function getHistory(){
+  try{return JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]')}catch(e){return[]}
+}
+
 // ==================== UI ====================
 const engine = new ScoringEngine();
 let noBallHitByBat = false;
@@ -298,6 +387,7 @@ function buzz(ms){if(navigator.vibrate)navigator.vibrate(ms||15)}
 
 function render(){
   const s=engine.state, e=engine;
+  saveState();
 
   // Header info
   if(s.matchStarted){
@@ -315,9 +405,11 @@ function render(){
     if(s.currentInning===2){
       $('setup-title').textContent='2nd Innings Setup';
       $('setup-team-fields').classList.add('hidden');
+      $('btn-match-history').classList.add('hidden');
     } else {
       $('setup-title').textContent='Match Setup';
       $('setup-team-fields').classList.remove('hidden');
+      $('btn-match-history').classList.remove('hidden');
     }
     return;
   }
@@ -419,9 +511,20 @@ function batRow(b,isStriker){
 }
 
 function renderSummary(){
-  const s=engine.state, e=engine;
+  _viewingHistoryMatch=null;
+  renderSummaryFrom(engine.state,engine);
+}
+
+function renderSummaryFrom(s,e,matchDate){
   const both=s.currentInning===2&&s.inning1BatsmenList.length>0;
+  const completed=!!s.matchResult;
   let h='';
+
+  if(matchDate){
+    const d=new Date(matchDate);
+    const dateStr=d.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short',year:'numeric'})+' • '+d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+    h+='<div style="text-align:center;font-size:.78rem;color:#5a6a7a;margin-bottom:8px">📅 '+dateStr+'</div>';
+  }
 
   // Score box
   h+='<div class="summary-score-box">';
@@ -449,7 +552,7 @@ function renderSummary(){
   } else {
     h+='<div class="summary-section-title">🏏 Batting</div>';
   }
-  h+=inningsBatCard(s.batsmenList,s.striker,s.nonStriker,s.runs,s.wickets,e.oversDisplay,e.totalExtras,s.totalWides,s.totalNoBalls,s.byes,s.legByes,false);
+  h+=inningsBatCard(s.batsmenList,s.striker,s.nonStriker,s.runs,s.wickets,e.oversDisplay,e.totalExtras,s.totalWides,s.totalNoBalls,s.byes,s.legByes,completed);
   h+='<div class="summary-section-title">🎯 Bowling</div>';
   h+=inningsBowlCard(s.bowlersList);
 
@@ -489,8 +592,108 @@ function inningsBowlCard(list){
   return h;
 }
 
+function renderHistory(){
+  const hist=getHistory();
+  const el=$('history-content');
+  if(hist.length===0){el.innerHTML='<p style="text-align:center;color:#5a6a7a;margin-top:20px">No matches scored yet.</p>';return}
+  let h='';
+  hist.forEach((m,i)=>{
+    const d=new Date(m.date);
+    const dateStr=d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})+' '+d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+    const oversFormat=(balls)=>Math.floor(balls/6)+'.'+balls%6;
+    h+='<div class="summary-card history-card" data-history-idx="'+i+'" style="margin-bottom:10px;cursor:pointer">';
+    h+='<div style="font-size:.7rem;color:#5a6a7a;margin-bottom:4px">'+dateStr+'</div>';
+    h+='<div style="font-weight:700;font-size:.95rem;margin-bottom:4px">'+m.team1+' vs '+m.team2+'</div>';
+    if(m.currentInning===1){
+      h+='<div style="font-size:.85rem">'+m.team1+': <b>'+m.inning2Runs+'/'+m.inning2Wickets+'</b> ('+oversFormat(m.inning2Balls||0)+' ov)</div>';
+    } else {
+      if(m.inning1Balls>0)h+='<div style="font-size:.85rem">'+m.team1+': <b>'+m.inning1Runs+'/'+m.inning1Wickets+'</b> ('+oversFormat(m.inning1Balls)+' ov)</div>';
+      if(m.inning2Balls>0)h+='<div style="font-size:.85rem">'+m.team2+': <b>'+m.inning2Runs+'/'+m.inning2Wickets+'</b> ('+oversFormat(m.inning2Balls)+' ov)</div>';
+    }
+    const isInProgress=m.result==='In Progress';
+    const resultColor=isInProgress?'#f57c00':'#4fc3f7';
+    h+='<div style="font-size:.8rem;font-weight:600;color:'+resultColor+';margin-top:4px">'+(isInProgress?'⏸ ':'')+m.result+'</div>';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">';
+    h+='<div style="font-size:.65rem;color:#5a6a7a">Tap to view</div>';
+    h+='<button class="btn btn-danger history-delete-btn" data-del-idx="'+i+'" style="font-size:.65rem;padding:4px 10px;min-height:auto;border-radius:8px">🗑 Delete</button>';
+    h+='</div>';
+    h+='</div>';
+  });
+  el.innerHTML=h;
+  el.querySelectorAll('.history-card').forEach(card=>{
+    card.onclick=(e)=>{
+      if(e.target.closest('.history-delete-btn'))return;
+      const idx=parseInt(card.dataset.historyIdx);
+      viewHistoryMatch(idx);
+    };
+  });
+  el.querySelectorAll('.history-delete-btn').forEach(btn=>{
+    btn.onclick=(e)=>{
+      e.stopPropagation();
+      const idx=parseInt(btn.dataset.delIdx);
+      deleteHistoryMatch(idx);
+    };
+  });
+}
+
+function deleteHistoryMatch(idx){
+  try{
+    const hist=JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');
+    hist.splice(idx,1);
+    localStorage.setItem(HISTORY_KEY,JSON.stringify(hist));
+  }catch(e){}
+  renderHistory();
+}
+
+let _viewingHistoryMatch=null;
+
+function historyMatchData(m){
+  const oversDisplay=b=>Math.floor(b/6)+'.'+b%6;
+  const totalExtras=(m.byes||0)+(m.legByes||0)+(m.totalWides||0)+(m.totalNoBalls||0);
+  const inn1TotalExtras=(m.inning1Byes||0)+(m.inning1LegByes||0)+(m.inning1Wides||0)+(m.inning1NoBalls||0);
+  return {
+    state:{
+      team1Name:m.team1,team2Name:m.team2,
+      inning1Runs:m.inning1Runs,inning1Wickets:m.inning1Wickets,inning1Balls:m.inning1Balls,
+      runs:m.inning2Runs,wickets:m.inning2Wickets,balls:m.inning2Balls,
+      currentInning:m.currentInning||2,matchResult:m.result,maxOvers:m.maxOvers,
+      inning1BatsmenList:m.inning1BatsmenList||[],inning1BowlersList:m.inning1BowlersList||[],
+      batsmenList:m.batsmenList||[],bowlersList:m.bowlersList||[],
+      striker:null,nonStriker:null,
+      byes:m.byes||0,legByes:m.legByes||0,totalWides:m.totalWides||0,totalNoBalls:m.totalNoBalls||0,
+      inning1Byes:m.inning1Byes||0,inning1LegByes:m.inning1LegByes||0,
+      inning1Wides:m.inning1Wides||0,inning1NoBalls:m.inning1NoBalls||0
+    },
+    oversDisplay:oversDisplay(m.inning2Balls||0),
+    inning1OversDisplay:oversDisplay(m.inning1Balls||0),
+    totalExtras:totalExtras,
+    inning1TotalExtras:inn1TotalExtras,
+    team1Nrr:null,team2Nrr:null
+  };
+}
+
+function viewHistoryMatch(idx){
+  const hist=getHistory();
+  const m=hist[idx];if(!m)return;
+  if(m.result==='In Progress'&&m.fullState){
+    engine.state=m.fullState.state;
+    engine.stateHistory=m.fullState.stateHistory||[];
+    hist.splice(idx,1);
+    try{localStorage.setItem(HISTORY_KEY,JSON.stringify(hist))}catch(e){}
+    hideModal('modal-history');
+    render();
+    return;
+  }
+  _viewingHistoryMatch=m;
+  const d=historyMatchData(m);
+  renderSummaryFrom(d.state,d,m.date);
+  hideModal('modal-history');
+  showModal('modal-summary');
+}
+
 // ==================== EVENT LISTENERS ====================
 document.addEventListener('DOMContentLoaded',()=>{
+  loadState();
   render();
 
   // Start match
@@ -567,11 +770,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   // Controls
   $('btn-undo').onclick=()=>{engine.undoLastBall();render()};
-  $('btn-reset').onclick=()=>showModal('modal-reset');
-  $('btn-reset-cancel').onclick=()=>hideModal('modal-reset');
-  $('btn-reset-yes').onclick=()=>{engine.reset();hideModal('modal-reset');render()};
   $('btn-declare').onclick=()=>{engine.declareInning();render()};
   $('btn-declare-from-bowler').onclick=()=>{engine.declareInning();render()};
+  $('btn-push-save').onclick=()=>{pushToSavedMatches();render()};
 
   // Swap
   $('btn-swap').onclick=()=>{engine.swapStrike();render()};
@@ -579,9 +780,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Summary
   $('btn-summary').onclick=()=>{renderSummary();showModal('modal-summary')};
   $('btn-result-summary').onclick=()=>{renderSummary();showModal('modal-summary')};
-  $('btn-close-summary').onclick=()=>hideModal('modal-summary');
+  $('btn-close-summary').onclick=()=>{_viewingHistoryMatch=null;hideModal('modal-summary')};
   $('btn-download-pdf').onclick=()=>{
-    const s=engine.state, e=engine;
+    let s,e;
+    if(_viewingHistoryMatch){const d=historyMatchData(_viewingHistoryMatch);s=d.state;e=d}
+    else{s=engine.state;e=engine}
     const {jsPDF}=window.jspdf;
     const doc=new jsPDF();
     const pw=doc.internal.pageSize.getWidth();
@@ -643,12 +846,13 @@ document.addEventListener('DOMContentLoaded',()=>{
       y=doc.lastAutoTable.finalY+8;
     }
 
+    const inn2Completed=!!s.matchResult;
     if(both){
       addBatTable('1st Innings — '+s.team1Name,s.inning1BatsmenList,null,null,s.inning1Runs,s.inning1Wickets,e.inning1OversDisplay,e.inning1TotalExtras,s.inning1Wides,s.inning1NoBalls,s.inning1Byes,s.inning1LegByes,true);
       addBowlTable('Bowling',s.inning1BowlersList);
-      addBatTable('2nd Innings — '+s.team2Name,s.batsmenList,s.striker,s.nonStriker,s.runs,s.wickets,e.oversDisplay,e.totalExtras,s.totalWides,s.totalNoBalls,s.byes,s.legByes,false);
+      addBatTable('2nd Innings — '+s.team2Name,s.batsmenList,s.striker,s.nonStriker,s.runs,s.wickets,e.oversDisplay,e.totalExtras,s.totalWides,s.totalNoBalls,s.byes,s.legByes,inn2Completed);
     } else {
-      addBatTable('Batting',s.batsmenList,s.striker,s.nonStriker,s.runs,s.wickets,e.oversDisplay,e.totalExtras,s.totalWides,s.totalNoBalls,s.byes,s.legByes,false);
+      addBatTable('Batting',s.batsmenList,s.striker,s.nonStriker,s.runs,s.wickets,e.oversDisplay,e.totalExtras,s.totalWides,s.totalNoBalls,s.byes,s.legByes,inn2Completed);
     }
     addBowlTable('Bowling',s.bowlersList);
 
@@ -669,7 +873,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   };
 
   // New match
-  $('btn-new-match').onclick=()=>{engine.reset();render()};
+  $('btn-new-match').onclick=()=>{engine.reset();clearSavedState();render()};
 
   // New batsman
   $('btn-confirm-batsman').onclick=()=>{
@@ -682,6 +886,10 @@ document.addEventListener('DOMContentLoaded',()=>{
     const n=$('input-new-bowler').value.trim();if(!n)return;
     engine.setNewBowler(n);render();
   };
+
+  // Match history
+  $('btn-match-history').onclick=()=>{renderHistory();showModal('modal-history')};
+  $('btn-close-history').onclick=()=>hideModal('modal-history');
 
   // Close modals on overlay click
   document.querySelectorAll('.modal-overlay').forEach(m=>{

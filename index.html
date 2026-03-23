@@ -30,6 +30,7 @@
     <div id="setup-team-fields">
       <input type="text" id="setup-team1" placeholder="Batting Team">
       <input type="text" id="setup-team2" placeholder="Bowling Team">
+      <input type="number" id="setup-overs" placeholder="Overs (e.g. 20, 50)" min="1" max="100">
     </div>
     <input type="text" id="setup-striker" placeholder="Striker">
     <input type="text" id="setup-nonstriker" placeholder="Non-Striker">
@@ -52,6 +53,7 @@
     <div id="new-batsman-prompt" class="prompt-card hidden">
       <h3>New Batsman</h3>
       <input type="text" id="input-new-batsman" placeholder="Batsman Name">
+      <div id="retired-hurt-list"></div>
       <button id="btn-confirm-batsman" class="btn btn-primary btn-full mt-8">Confirm</button>
     </div>
 
@@ -60,7 +62,7 @@
       <input type="text" id="input-new-bowler" placeholder="Bowler Name">
       <div id="existing-bowlers-list"></div>
       <button id="btn-confirm-bowler" class="btn btn-primary btn-full mt-8">Confirm</button>
-      <button id="btn-declare-from-bowler" class="btn btn-outline btn-full mt-8 hidden">📢 Declare Innings</button>
+
     </div>
 
     <div id="score-card" class="card">
@@ -121,7 +123,7 @@
     <div id="match-controls">
       <div class="controls-row">
         <button id="btn-undo" class="btn btn-secondary">Undo</button>
-        <button id="btn-declare" class="btn btn-primary">Declare</button>
+
       </div>
       <button id="btn-summary" class="btn btn-secondary btn-full">📋 Summary</button>
       <button id="btn-push-save" class="btn btn-outline btn-full mt-8">💾 Push to Saved Matches</button>
@@ -211,7 +213,21 @@
         <button class="btn btn-danger" data-wicket-type="bowled">Bowled</button>
         <button class="btn btn-danger" data-wicket-type="caught">Caught Out</button>
         <button class="btn btn-danger" data-wicket-type="lbw">LBW</button>
+        <button class="btn btn-danger" data-wicket-type="stumped">Stumping</button>
+        <button class="btn btn-danger" data-wicket-type="hitwicket">Hit Wicket</button>
         <button class="btn btn-danger" data-wicket-type="runout">Run Out</button>
+        <button class="btn btn-outline" data-wicket-type="retiredhurt">Retired Hurt</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-retired-who" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h3>Retired Hurt</h3>
+      <p class="modal-subtitle">Which batsman is retiring?</p>
+      <div class="modal-buttons modal-buttons-col">
+        <button id="btn-retire-striker" class="btn btn-outline"></button>
+        <button id="btn-retire-nonstriker" class="btn btn-outline"></button>
       </div>
     </div>
   </div>

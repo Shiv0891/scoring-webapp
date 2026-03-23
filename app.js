@@ -14,7 +14,8 @@ class ScoringEngine {
       striker:null, nonStriker:null, currentBowler:null,
       batsmenList:[], bowlersList:[], matchStarted:false,
       byes:0, legByes:0, totalWides:0, totalNoBalls:0,
-      team1Name:'Team 1', team2Name:'Team 2'
+      team1Name:'Team 1', team2Name:'Team 2',
+      retiredHurt:[]
     };
   }
   _dc(o){return JSON.parse(JSON.stringify(o))}
@@ -28,9 +29,9 @@ class ScoringEngine {
     if(this.state.maxOvers&&this.state.balls>=this.state.maxOvers*6)return false;
     return this.state.matchStarted;
   }
-  get canDeclare(){return this.state.currentInning===1&&this.state.balls>0&&this.state.balls%6===0}
+
   get canTakeWicket(){return this.isScoringAllowed&&this.state.wickets<10}
-  get needsNewBatsman(){return this.state.matchStarted&&(!this.state.striker||!this.state.nonStriker)&&this.state.wickets<10}
+  get needsNewBatsman(){return this.state.matchStarted&&(!this.state.striker||!this.state.nonStriker)&&(this.state.wickets<10||this.state.retiredHurt.length>0)}
   get needsNewBowler(){return this.state.matchStarted&&!this.state.currentBowler}
   get legalBallsInOver(){return this.state.balls%6}
   get ballsRemaining(){return 6-this.legalBallsInOver}
@@ -66,12 +67,12 @@ class ScoringEngine {
   }
 
   // Actions
-  startMatch(t1,t2,striker,nonStriker,bowler){
+  startMatch(t1,t2,striker,nonStriker,bowler,overs){
     const b1={name:striker,runs:0,ballsFaced:0,fours:0,sixes:0,isOut:false};
     const b2={name:nonStriker,runs:0,ballsFaced:0,fours:0,sixes:0,isOut:false};
     const bw={name:bowler,runsConceded:0,ballsBowled:0,wicketsTaken:0,wides:0,noBalls:0,maidens:0};
     this.state=this._freshState();
-    Object.assign(this.state,{matchId:Date.now()+'-'+Math.random().toString(36).slice(2,8),striker:b1,nonStriker:b2,currentBowler:bw,batsmenList:[this._dc(b1),this._dc(b2)],bowlersList:[this._dc(bw)],matchStarted:true,team1Name:t1||'Team 1',team2Name:t2||'Team 2'});
+    Object.assign(this.state,{matchId:Date.now()+'-'+Math.random().toString(36).slice(2,8),striker:b1,nonStriker:b2,currentBowler:bw,batsmenList:[this._dc(b1),this._dc(b2)],bowlersList:[this._dc(bw)],matchStarted:true,team1Name:t1||'Team 1',team2Name:t2||'Team 2',maxOvers:overs||null});
   }
 
   swapStrike(){const t=this.state.striker;this.state.striker=this.state.nonStriker;this.state.nonStriker=t}
@@ -81,6 +82,27 @@ class ScoringEngine {
     this.state.batsmenList.push(this._dc(nb));
     if(!this.state.striker)this.state.striker=this._dc(nb);
     else this.state.nonStriker=this._dc(nb);
+  }
+
+  retireHurt(who){
+    if(!this.state.matchStarted)return;
+    this._save();
+    const s=this.state;
+    const bat=who==='striker'?s.striker:s.nonStriker;
+    if(!bat)return;
+    s.retiredHurt.push(this._dc(bat));
+    if(who==='striker')s.striker=null;
+    else s.nonStriker=null;
+  }
+
+  returnBatsman(name){
+    const s=this.state;
+    const idx=s.retiredHurt.findIndex(b=>b.name===name);
+    if(idx<0)return;
+    const bat=this._dc(s.retiredHurt[idx]);
+    s.retiredHurt.splice(idx,1);
+    if(!s.striker)s.striker=bat;
+    else s.nonStriker=bat;
   }
 
   setNewBowler(name){
@@ -146,7 +168,7 @@ class ScoringEngine {
   }
 
   wicket(dismissalType,outBatsman,runOutRuns){
-    // dismissalType: 'bowled','caught','lbw','runout'
+    // dismissalType: 'bowled','caught','lbw','stumped','hitwicket','runout'
     // outBatsman: 'striker' or 'nonStriker' (only used for runout)
     // runOutRuns: number of completed runs before run out (only for runout)
     if(!this.canTakeWicket||!this.state.striker||!this.state.currentBowler)return;
@@ -164,7 +186,7 @@ class ScoringEngine {
     if(isRunOut&&!outIsStriker)this._syncBatsman(s.nonStriker);
 
     if(s.wickets===10&&s.currentInning===1){
-      const overs=Math.ceil(s.balls/6);
+      const overs=s.maxOvers||Math.ceil(s.balls/6);
       this._applyMaiden(bw,{type:'wicket'});
       this._syncLists(str,bw);
       const saved={inning1Runs:s.runs,inning1Wickets:s.wickets,inning1Balls:s.balls,
@@ -217,16 +239,7 @@ class ScoringEngine {
     this._checkForWinner();
   }
 
-  declareInning(){
-    if(!this.canDeclare)return;
-    const s=this.state;
-    const saved={inning1Runs:s.runs,inning1Wickets:s.wickets,inning1Balls:s.balls,
-      inning1BatsmenList:this._dc(s.batsmenList),inning1BowlersList:this._dc(s.bowlersList),
-      inning1Byes:s.byes,inning1LegByes:s.legByes,inning1Wides:s.totalWides,inning1NoBalls:s.totalNoBalls,
-      team1Name:s.team1Name,team2Name:s.team2Name};
-    this.state=this._freshState();
-    Object.assign(this.state,saved,{currentInning:2,hasInning1Score:true,maxOvers:saved.inning1Balls/6});
-  }
+
 
   startSecondInning(striker,nonStriker,bowler){
     const b1={name:striker,runs:0,ballsFaced:0,fours:0,sixes:0,isOut:false};
@@ -270,9 +283,26 @@ class ScoringEngine {
     if(runsOff===0)bw.maidens++;
   }
 
+  _checkInningsComplete(){
+    const s=this.state;
+    if(s.currentInning!==1||!s.maxOvers)return false;
+    if(s.balls>=s.maxOvers*6){
+      const saved={inning1Runs:s.runs,inning1Wickets:s.wickets,inning1Balls:s.balls,
+        inning1BatsmenList:this._dc(s.batsmenList),inning1BowlersList:this._dc(s.bowlersList),
+        inning1Byes:s.byes,inning1LegByes:s.legByes,inning1Wides:s.totalWides,inning1NoBalls:s.totalNoBalls,
+        team1Name:s.team1Name,team2Name:s.team2Name};
+      const overs=s.maxOvers;
+      this.state=this._freshState();
+      Object.assign(this.state,saved,{currentInning:2,hasInning1Score:true,maxOvers:overs});
+      return true;
+    }
+    return false;
+  }
+
   _checkForWinner(){
     const s=this.state;
-    if(s.currentInning!==2||!this.targetScore)return;
+    if(s.currentInning===1){this._checkInningsComplete();return}
+    if(!this.targetScore)return;
     const target=this.targetScore;
     if(s.runs>=target){s.matchResult=s.team2Name+' won by '+(10-s.wickets)+' wickets!';return}
     const maxReached=s.maxOvers&&s.balls>=s.maxOvers*6;
@@ -421,7 +451,17 @@ function render(){
   hide('match-setup');show('live-scoring');hide('match-result');
 
   // Prompts
-  if(e.needsNewBatsman){show('new-batsman-prompt');$('input-new-batsman').value=''}else hide('new-batsman-prompt');
+  if(e.needsNewBatsman){
+    show('new-batsman-prompt');$('input-new-batsman').value='';
+    const rhList=$('retired-hurt-list');if(rhList)rhList.innerHTML='';
+    if(s.retiredHurt&&s.retiredHurt.length>0&&rhList){
+      const lbl=document.createElement('p');lbl.textContent='Or return retired batsman:';lbl.style.fontSize='.8rem';lbl.style.color='#5a6a7a';lbl.style.margin='6px 0 4px';rhList.appendChild(lbl);
+      s.retiredHurt.forEach(b=>{
+        const btn=document.createElement('button');btn.className='btn btn-outline existing-bowler-btn';btn.textContent=b.name+' ('+b.runs+' runs)';
+        btn.onclick=()=>{engine.returnBatsman(b.name);render()};rhList.appendChild(btn);
+      });
+    }
+  }else hide('new-batsman-prompt');
   if(e.needsNewBowler){
     show('new-bowler-prompt');$('input-new-bowler').value='';
     const list=$('existing-bowlers-list');list.innerHTML='';
@@ -432,12 +472,12 @@ function render(){
         btn.onclick=()=>{engine.setNewBowler(b.name);render()};list.appendChild(btn);
       });
     }
-    if(e.canDeclare)show('btn-declare-from-bowler');else hide('btn-declare-from-bowler');
+
   } else hide('new-bowler-prompt');
 
   // Score card
   $('score-display').textContent=s.runs+'/'+s.wickets;
-  const oText=s.currentInning===2&&s.maxOvers?'Overs: '+e.oversDisplay+' / '+s.maxOvers:'Overs: '+e.oversDisplay;
+  const oText=s.maxOvers?'Overs: '+e.oversDisplay+' / '+s.maxOvers:'Overs: '+e.oversDisplay;
   $('overs-display').textContent=oText;
 
   let chaseHTML='';
@@ -460,7 +500,7 @@ function render(){
   $('btn-noball').disabled=!e.isScoringAllowed;
   $('btn-bye').disabled=!e.isScoringAllowed;
   $('btn-legbye').disabled=!e.isScoringAllowed;
-  $('btn-declare').disabled=!e.canDeclare;
+
 
   // Over summary
   const overNum=Math.floor(s.balls/6);
@@ -705,10 +745,11 @@ document.addEventListener('DOMContentLoaded',()=>{
       engine.startSecondInning(str,ns,bw);
     } else {
       const t1=$('setup-team1').value.trim()||'Team 1', t2=$('setup-team2').value.trim()||'Team 2';
-      engine.startMatch(t1,t2,str,ns,bw);
+      const overs=parseInt($('setup-overs').value)||null;
+      engine.startMatch(t1,t2,str,ns,bw,overs);
     }
     $('setup-striker').value='';$('setup-nonstriker').value='';$('setup-bowler').value='';
-    $('setup-team1').value='';$('setup-team2').value='';
+    $('setup-team1').value='';$('setup-team2').value='';$('setup-overs').value='';
     render();
   };
 
@@ -727,6 +768,11 @@ document.addEventListener('DOMContentLoaded',()=>{
       hideModal('modal-wicket-type');
       if(type==='runout'){
         showModal('modal-runout-runs');
+      } else if(type==='retiredhurt'){
+        const s=engine.state;
+        $('btn-retire-striker').textContent=s.striker?s.striker.name+' (Striker)':'Striker';
+        $('btn-retire-nonstriker').textContent=s.nonStriker?s.nonStriker.name+' (Non-Striker)':'Non-Striker';
+        showModal('modal-retired-who');
       } else {
         engine.wicket(type,'striker');render();
       }
@@ -744,6 +790,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
   $('btn-runout-striker').onclick=()=>{hideModal('modal-runout-who');engine.wicket('runout','striker',runOutRunsScored);render()};
   $('btn-runout-nonstriker').onclick=()=>{hideModal('modal-runout-who');engine.wicket('runout','nonStriker',runOutRunsScored);render()};
+
+  $('btn-retire-striker').onclick=()=>{hideModal('modal-retired-who');engine.retireHurt('striker');render()};
+  $('btn-retire-nonstriker').onclick=()=>{hideModal('modal-retired-who');engine.retireHurt('nonStriker');render()};
 
   // Extras
   $('btn-wide').onclick=()=>showModal('modal-wide');
@@ -770,8 +819,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   // Controls
   $('btn-undo').onclick=()=>{engine.undoLastBall();render()};
-  $('btn-declare').onclick=()=>{engine.declareInning();render()};
-  $('btn-declare-from-bowler').onclick=()=>{engine.declareInning();render()};
+
   $('btn-push-save').onclick=()=>{pushToSavedMatches();render()};
 
   // Swap

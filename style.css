@@ -8,9 +8,10 @@ body{margin:0;padding:0;background:#0f1923;font-family:'Inter',sans-serif;color:
 #header-batting-label{font-size:.8rem;font-weight:600;opacity:.75;margin-top:3px}
 .card{background:#1a2634;border-radius:16px;padding:14px;margin-top:10px;box-shadow:0 2px 12px rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.05)}
 .section-title{font-weight:700;font-size:.95rem;margin-bottom:8px;color:#8ab4f8}
-input[type="text"]{width:100%;padding:14px 16px;border:1px solid rgba(255,255,255,.12);border-radius:12px;font-size:1rem;margin-bottom:10px;outline:none;font-family:inherit;background:#0f1923;color:#e0e6ed;transition:border-color .2s;min-height:48px}
-input[type="text"]:focus{border-color:#1a73e8;box-shadow:0 0 0 3px rgba(26,115,232,.2)}
-input[type="text"]::placeholder{color:#5a6a7a}
+input[type="text"],input[type="number"]{width:100%;padding:14px 16px;border:1px solid rgba(255,255,255,.12);border-radius:12px;font-size:1rem;margin-bottom:10px;outline:none;font-family:inherit;background:#0f1923;color:#e0e6ed;transition:border-color .2s;min-height:48px;-moz-appearance:textfield}
+input[type="number"]::-webkit-outer-spin-button,input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type="text"]:focus,input[type="number"]:focus{border-color:#1a73e8;box-shadow:0 0 0 3px rgba(26,115,232,.2)}
+input[type="text"]::placeholder,input[type="number"]::placeholder{color:#5a6a7a}
 .btn{padding:14px 14px;border-radius:12px;font-weight:600;font-size:1rem;border:none;cursor:pointer;font-family:inherit;transition:all .15s ease;min-height:48px;touch-action:manipulation}
 .btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.3)}
 .btn:active:not(:disabled){transform:scale(.95);opacity:.85}.btn:disabled{opacity:.35;cursor:not-allowed}

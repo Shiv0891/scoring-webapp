@@ -16,7 +16,18 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
-<div id="app">
+<div id="lock-screen">
+  <div class="lock-card">
+    <div class="lock-emoji">🏏</div>
+    <h2 class="lock-title">Cricket Scorer</h2>
+    <p class="lock-subtitle">Enter credentials to continue</p>
+    <input type="text" id="lock-user" placeholder="Username" autocomplete="off">
+    <input type="password" id="lock-pin" placeholder="Password" maxlength="10" autocomplete="off">
+    <button id="btn-unlock" class="btn btn-primary btn-full">Unlock</button>
+    <p id="lock-error" class="lock-error hidden">Incorrect username or password</p>
+  </div>
+</div>
+<div id="app" class="hidden">
 
   <div id="app-header">
     <div id="header-title">🏏 Cricket Scorer</div>
@@ -264,6 +275,23 @@
   </div>
 
 </div>
+<script>
+(function(){
+  const USER='BAPS',PASS='1907';
+  const UNLOCK_KEY='cricket_scorer_unlocked';
+  function unlock(){
+    document.getElementById('lock-screen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    try{sessionStorage.setItem(UNLOCK_KEY,'1')}catch(e){}
+  }
+  if(sessionStorage.getItem(UNLOCK_KEY)==='1'){unlock()}
+  document.getElementById('btn-unlock').onclick=function(){
+    if(document.getElementById('lock-user').value===USER&&document.getElementById('lock-pin').value===PASS){unlock()}
+    else{document.getElementById('lock-error').classList.remove('hidden');document.getElementById('lock-pin').value=''}
+  };
+  document.getElementById('lock-pin').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('btn-unlock').click()});
+})();
+</script>
 <script src="app.js"></script>
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>

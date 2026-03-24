@@ -19,7 +19,7 @@ async function freshPage() {
   await p.setViewport({ width: 480, height: 960 });
   await p.goto(FILE_URL, { waitUntil: 'domcontentloaded' });
   // Clear any persisted state so each test starts clean
-  await p.evaluate(() => { localStorage.clear(); location.reload(); });
+  await p.evaluate(() => { localStorage.clear(); sessionStorage.setItem('cricket_scorer_unlocked','1'); location.reload(); });
   await p.waitForSelector('#match-setup');
   // Helper: click via JS to avoid headless "not clickable" issues
   p.jsClick = async (sel) => p.$eval(sel, el => el.click());

@@ -63,7 +63,7 @@ async function freshPage() {
   const p = await browser.newPage();
   await p.setViewport({ width: 480, height: 960 });
   await p.goto(FILE_URL, { waitUntil: 'domcontentloaded' });
-  await p.evaluate(() => { localStorage.clear(); location.reload(); });
+  await p.evaluate(() => { localStorage.clear(); sessionStorage.setItem('cricket_scorer_unlocked','1'); location.reload(); });
   await p.waitForSelector('#match-setup');
   p.jsClick = async (sel) => p.$eval(sel, el => el.click());
   return p;

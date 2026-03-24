@@ -97,4 +97,5 @@ input[type="text"]::placeholder,input[type="number"]::placeholder{color:#5a6a7a}
 /* Setup title */
 #setup-title{color:#fff}
 #setup-team-fields{display:flex;gap:8px}
-#setup-team-fields input{flex:1}
+#setup-team-fields input{flex:1;font-size:.85rem;padding:12px 10px}
+#setup-team-fields input::placeholder{font-size:.8rem}

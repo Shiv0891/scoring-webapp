@@ -19,9 +19,9 @@ const FILE_URL = 'file://' + path.resolve(__dirname, 'index.html');
 const IPL_ZIP_URL = 'https://cricsheet.org/downloads/ipl_json.zip';
 const TMP_DIR = '/tmp/ipl_replay';
 
-let browser, matchData, matchFile;
+let browser, matchFiles;
 
-// ── Download & pick a match ─────────────────────────────────────────
+// ── Download & pick matches ─────────────────────────────────────────
 before(async () => {
   // Download IPL JSON zip
   if (!fs.existsSync(path.join(TMP_DIR, 'done'))) {
@@ -31,23 +31,32 @@ before(async () => {
     fs.writeFileSync(path.join(TMP_DIR, 'done'), '1');
   }
 
-  // Pick a match file (use env var MATCH_FILE or pick the latest)
-  if (process.env.MATCH_FILE) {
-    matchFile = process.env.MATCH_FILE;
+  // Pick match files: MATCH_FILES (comma-sep), MATCH_FILE, or latest
+  if (process.env.MATCH_FILES) {
+    matchFiles = process.env.MATCH_FILES.split(',').map(f => f.trim());
+  } else if (process.env.MATCH_FILE) {
+    matchFiles = [process.env.MATCH_FILE];
   } else {
     const files = fs.readdirSync(TMP_DIR).filter(f => f.endsWith('.json')).sort();
-    matchFile = path.join(TMP_DIR, files[files.length - 1]);
+    matchFiles = [path.join(TMP_DIR, files[files.length - 1])];
   }
-  matchData = JSON.parse(fs.readFileSync(matchFile, 'utf8'));
-  console.log(`\n🏏 Replaying: ${matchData.info.teams.join(' vs ')}`);
-  console.log(`   File: ${path.basename(matchFile)}`);
-  console.log(`   Overs: ${matchData.info.overs}`);
-  console.log(`   Result: ${JSON.stringify(matchData.info.outcome)}\n`);
 
-  browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+  console.log(`\n🏏 Will replay ${matchFiles.length} match(es)\n`);
+
+  const isHeadless = process.env.HEADLESS !== 'false';
+  browser = await puppeteer.launch({ headless: isHeadless, args: ['--no-sandbox'], slowMo: isHeadless ? 0 : 5 });
 });
 
-after(async () => { if (browser) await browser.close(); });
+after(async () => {
+  if (browser) {
+    if (process.env.HEADLESS === 'false') {
+      console.log('\n⏸️  Browser is open — close it manually when done.');
+      await new Promise(r => browser.on('disconnected', r));
+    } else {
+      await browser.close();
+    }
+  }
+});
 
 // ── Helpers ─────────────────────────────────────────────────────────
 async function freshPage() {
@@ -70,9 +79,8 @@ function mapWicketKind(kind) {
   return map[kind] || 'bowled';
 }
 
-// ── Main replay test ────────────────────────────────────────────────
-test('Replay full IPL match through the UI', { timeout: 120_000 }, async () => {
-  const page = await freshPage();
+// ── Replay a single match on the given page ─────────────────────────
+async function replayMatch(page, matchData) {
   const info = matchData.info;
   const innings = matchData.innings;
   const maxOvers = info.overs || 20;
@@ -82,13 +90,11 @@ test('Replay full IPL match through the UI', { timeout: 120_000 }, async () => {
 
   for (let innIdx = 0; innIdx < innings.length; innIdx++) {
     const inn = innings[innIdx];
-    // Skip super overs
     if (inn.super_over) continue;
 
     const battingTeam = inn.team;
     const bowlingTeam = info.teams.find(t => t !== battingTeam);
 
-    // Determine opening batsmen and bowler from first delivery
     const firstDel = inn.overs[0].deliveries[0];
     const striker = firstDel.batter;
     const nonStriker = firstDel.non_striker;
@@ -98,7 +104,6 @@ test('Replay full IPL match through the UI', { timeout: 120_000 }, async () => {
     console.log(`   Opener: ${striker} & ${nonStriker} | Bowler: ${openingBowler}`);
 
     if (innIdx === 0) {
-      // First innings: fill match setup
       await page.type('#setup-team1', battingTeam);
       await page.type('#setup-team2', bowlingTeam);
       await page.$eval('#setup-overs', (el, v) => { el.value = v; }, String(maxOvers));
@@ -108,7 +113,6 @@ test('Replay full IPL match through the UI', { timeout: 120_000 }, async () => {
       await page.jsClick('#btn-start-match');
       await page.waitForSelector('#live-scoring:not(.hidden)');
     } else {
-      // Second innings: fill 2nd innings setup
       await page.waitForSelector('#match-setup:not(.hidden)');
       await page.type('#setup-striker', striker);
       await page.type('#setup-nonstriker', nonStriker);
@@ -325,9 +329,30 @@ test('Replay full IPL match through the UI', { timeout: 120_000 }, async () => {
   console.log(`\n📊 Total boundaries: ${totalBoundaries}`);
   console.log(`📊 Total wickets: ${totalWickets}`);
 
-  // Verify the match produced a result or is still in valid state
   const finalScore = await page.$eval('#score-display', el => el.textContent).catch(() => null);
   assert.ok(finalScore, 'App should show a score');
+}
 
-  await page.close();
+// ── Main test: replay all matches in the same tab ───────────────────
+test('Replay IPL matches through the UI', { timeout: 600_000 }, async () => {
+  const page = await freshPage();
+
+  for (let m = 0; m < matchFiles.length; m++) {
+    const matchData = JSON.parse(fs.readFileSync(matchFiles[m], 'utf8'));
+    console.log(`\n${'═'.repeat(60)}`);
+    console.log(`🏏 Match ${m + 1}/${matchFiles.length}: ${matchData.info.teams.join(' vs ')}`);
+    console.log(`   File: ${path.basename(matchFiles[m])}`);
+    console.log(`   Expected: ${JSON.stringify(matchData.info.outcome)}`);
+    console.log('═'.repeat(60));
+
+    if (m > 0) {
+      // Click "New Match" to reset for next match
+      await page.jsClick('#btn-new-match');
+      await page.waitForSelector('#match-setup:not(.hidden)');
+    }
+
+    await replayMatch(page, matchData);
+  }
+
+  if (process.env.HEADLESS !== 'false') await page.close();
 });

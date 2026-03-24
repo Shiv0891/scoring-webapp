@@ -189,7 +189,7 @@ class ScoringEngine {
       const overs=s.maxOvers||Math.ceil(s.balls/6);
       this._applyMaiden(bw,{type:'wicket'});
       this._syncLists(str,bw);
-      const saved={inning1Runs:s.runs,inning1Wickets:s.wickets,inning1Balls:s.balls,
+      const saved={matchId:s.matchId,inning1Runs:s.runs,inning1Wickets:s.wickets,inning1Balls:s.balls,
         inning1BatsmenList:this._dc(s.batsmenList),inning1BowlersList:this._dc(s.bowlersList),
         inning1Byes:s.byes,inning1LegByes:s.legByes,inning1Wides:s.totalWides,inning1NoBalls:s.totalNoBalls,
         team1Name:s.team1Name,team2Name:s.team2Name};
@@ -287,7 +287,7 @@ class ScoringEngine {
     const s=this.state;
     if(s.currentInning!==1||!s.maxOvers)return false;
     if(s.balls>=s.maxOvers*6){
-      const saved={inning1Runs:s.runs,inning1Wickets:s.wickets,inning1Balls:s.balls,
+      const saved={matchId:s.matchId,inning1Runs:s.runs,inning1Wickets:s.wickets,inning1Balls:s.balls,
         inning1BatsmenList:this._dc(s.batsmenList),inning1BowlersList:this._dc(s.bowlersList),
         inning1Byes:s.byes,inning1LegByes:s.legByes,inning1Wides:s.totalWides,inning1NoBalls:s.totalNoBalls,
         team1Name:s.team1Name,team2Name:s.team2Name};

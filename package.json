@@ -1,0 +1,27 @@
+{
+  "dependencies": {
+    "pako": "^2.1.0"
+  },
+  "name": "scoring-webapp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "devDependencies": {
+    "puppeteer": "^24.40.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Shiv0891/scoring-webapp.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Shiv0891/scoring-webapp/issues"
+  },
+  "homepage": "https://github.com/Shiv0891/scoring-webapp#readme"
+}

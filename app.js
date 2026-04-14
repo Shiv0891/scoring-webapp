@@ -9,11 +9,11 @@ class ScoringEngine {
       matchId:null, runs:0, wickets:0, balls:0, currentInning:1,
       inning1Runs:0, inning1Wickets:0, hasInning1Score:false, inning1Balls:0,
       inning1BatsmenList:[], inning1BowlersList:[],
-      inning1Byes:0, inning1LegByes:0, inning1Wides:0, inning1NoBalls:0,
+      inning1Byes:0, inning1LegByes:0, inning1Wides:0, inning1NoBalls:0, inning1Overthrows:0, inning1History:[],
       matchResult:null, maxOvers:null, history:[],
       striker:null, nonStriker:null, currentBowler:null,
       batsmenList:[], bowlersList:[], matchStarted:false,
-      byes:0, legByes:0, totalWides:0, totalNoBalls:0,
+      byes:0, legByes:0, totalWides:0, totalNoBalls:0, overthrows:0,
       team1Name:'Team 1', team2Name:'Team 2',
       retiredHurt:[]
     };
@@ -35,10 +35,10 @@ class ScoringEngine {
   get needsNewBowler(){return this.state.matchStarted&&!this.state.currentBowler}
   get legalBallsInOver(){return this.state.balls%6}
   get ballsRemaining(){return 6-this.legalBallsInOver}
-  get fieldingExtras(){return this.state.byes+this.state.legByes}
+  get fieldingExtras(){return this.state.byes+this.state.legByes+this.state.overthrows}
   get bowlingExtras(){return this.state.totalWides+this.state.totalNoBalls}
   get totalExtras(){return this.fieldingExtras+this.bowlingExtras}
-  get inning1FieldingExtras(){return this.state.inning1Byes+this.state.inning1LegByes}
+  get inning1FieldingExtras(){return this.state.inning1Byes+this.state.inning1LegByes+(this.state.inning1Overthrows||0)}
   get inning1BowlingExtras(){return this.state.inning1Wides+this.state.inning1NoBalls}
   get inning1TotalExtras(){return this.inning1FieldingExtras+this.inning1BowlingExtras}
   get inning1OversDisplay(){return Math.floor(this.state.inning1Balls/6)+'.'+this.state.inning1Balls%6}
@@ -58,11 +58,11 @@ class ScoringEngine {
     const h=this.state.history, needed=this.legalBallsInOver;
     let legal=0, start=h.length;
     for(let i=h.length-1;i>=0;i--){
-      if(h[i].type!=='wide'&&h[i].type!=='noBall')legal++;
+      if(h[i].type!=='wide'&&h[i].type!=='noBall'&&h[i].type!=='overthrow')legal++;
       if(legal===needed){start=i;if(needed>0)break}
     }
     if(legal<needed)start=0;
-    while(start>0){const p=h[start-1];if(p.type==='wide'||p.type==='noBall')start--;else break}
+    while(start>0){const p=h[start-1];if(p.type==='wide'||p.type==='noBall'||p.type==='overthrow')start--;else break}
     return h.slice(start);
   }
 
@@ -117,7 +117,7 @@ class ScoringEngine {
     const s=this.state, str=s.striker, bw=s.currentBowler;
     str.runs+=r;str.ballsFaced++;if(r===4)str.fours++;if(r===6)str.sixes++;
     bw.runsConceded+=r;bw.ballsBowled++;
-    s.runs+=r;s.balls++;s.history.push({type:'runs',value:r});
+    s.runs+=r;s.balls++;s.history.push({type:'runs',value:r,bowler:bw.name});
     const isOverEnd=s.balls%6===0, shouldSwap=r%2===1, finalSwap=shouldSwap!==isOverEnd;
     if(isOverEnd)this._applyMaiden(bw,{type:'runs',value:r});
     this._syncLists(str,bw);
@@ -131,7 +131,7 @@ class ScoringEngine {
     this._save();
     const s=this.state, str=s.striker, bw=s.currentBowler;
     str.ballsFaced++;bw.ballsBowled++;
-    s.balls++;s.history.push({type:'dot'});
+    s.balls++;s.history.push({type:'dot',bowler:bw.name});
     const isOverEnd=s.balls%6===0;
     if(isOverEnd)this._applyMaiden(bw,{type:'dot'});
     this._syncLists(str,bw);
@@ -144,7 +144,7 @@ class ScoringEngine {
     this._save();
     const s=this.state, str=s.striker, bw=s.currentBowler;
     str.ballsFaced++;bw.ballsBowled++;
-    s.runs+=runs;s.balls++;s.byes+=runs;s.history.push({type:'bye',value:runs});
+    s.runs+=runs;s.balls++;s.byes+=runs;s.history.push({type:'bye',value:runs,bowler:bw.name});
     const isOverEnd=s.balls%6===0, shouldSwap=runs%2===1, finalSwap=shouldSwap!==isOverEnd;
     if(isOverEnd)this._applyMaiden(bw,{type:'bye',value:runs});
     this._syncLists(str,bw);
@@ -158,7 +158,7 @@ class ScoringEngine {
     this._save();
     const s=this.state, str=s.striker, bw=s.currentBowler;
     str.ballsFaced++;bw.ballsBowled++;
-    s.runs+=runs;s.balls++;s.legByes+=runs;s.history.push({type:'legBye',value:runs});
+    s.runs+=runs;s.balls++;s.legByes+=runs;s.history.push({type:'legBye',value:runs,bowler:bw.name});
     const isOverEnd=s.balls%6===0, shouldSwap=runs%2===1, finalSwap=shouldSwap!==isOverEnd;
     if(isOverEnd)this._applyMaiden(bw,{type:'legBye',value:runs});
     this._syncLists(str,bw);
@@ -181,7 +181,7 @@ class ScoringEngine {
     const roRuns=isRunOut&&runOutRuns?runOutRuns:0;
     if(roRuns>0){str.runs+=roRuns;if(roRuns===4)str.fours++;if(roRuns===6)str.sixes++;s.runs+=roRuns;bw.runsConceded+=roRuns}
     str.ballsFaced++;bw.ballsBowled++;if(!isRunOut)bw.wicketsTaken++;
-    s.wickets++;s.balls++;s.history.push({type:'wicket',dismissal:dismissalType,outBatsman:outIsStriker?'striker':'nonStriker',runOutRuns:roRuns});
+    s.wickets++;s.balls++;s.history.push({type:'wicket',dismissal:dismissalType,outBatsman:outIsStriker?'striker':'nonStriker',runOutRuns:roRuns,bowler:bw.name});
     this._syncLists(str,bw);
     if(isRunOut&&!outIsStriker)this._syncBatsman(s.nonStriker);
 
@@ -192,6 +192,7 @@ class ScoringEngine {
       const saved={matchId:s.matchId,inning1Runs:s.runs,inning1Wickets:s.wickets,inning1Balls:s.balls,
         inning1BatsmenList:this._dc(s.batsmenList),inning1BowlersList:this._dc(s.bowlersList),
         inning1Byes:s.byes,inning1LegByes:s.legByes,inning1Wides:s.totalWides,inning1NoBalls:s.totalNoBalls,
+        inning1Overthrows:s.overthrows,inning1History:this._dc(s.history),
         team1Name:s.team1Name,team2Name:s.team2Name};
       this.state=this._freshState();
       Object.assign(this.state,saved,{currentInning:2,hasInning1Score:true,maxOvers:overs});
@@ -221,7 +222,7 @@ class ScoringEngine {
     this._save();
     const s=this.state, bw=s.currentBowler;
     bw.runsConceded+=extra;bw.wides++;
-    s.runs+=extra;s.totalWides+=extra;s.history.push({type:'wide',value:extra});
+    s.runs+=extra;s.totalWides+=extra;s.history.push({type:'wide',value:extra,bowler:bw.name});
     this._syncBowler(bw);
     if((extra-1)%2===1){const t=s.striker;s.striker=s.nonStriker;s.nonStriker=t}
     this._checkForWinner();
@@ -233,13 +234,20 @@ class ScoringEngine {
     const s=this.state, bw=s.currentBowler, str=s.striker;
     bw.runsConceded+=extra;bw.noBalls++;
     if(hitByBat){const br=extra-1;str.runs+=br;str.ballsFaced++;if(br===4)str.fours++;if(br===6)str.sixes++;this._syncBatsman(str)}
-    s.runs+=extra;s.totalNoBalls++;s.history.push({type:'noBall',value:extra,hitByBat});
+    s.runs+=extra;s.totalNoBalls++;s.history.push({type:'noBall',value:extra,hitByBat,bowler:bw.name});
     this._syncBowler(bw);
     if((extra-1)%2===1){const t=s.striker;s.striker=s.nonStriker;s.nonStriker=t}
     this._checkForWinner();
   }
 
-
+  overthrow(runs){
+    if(!this.isScoringAllowed)return;
+    this._save();
+    const s=this.state;
+    s.runs+=runs;s.overthrows+=runs;s.history.push({type:'overthrow',value:runs});
+    if(runs%2===1){const t=s.striker;s.striker=s.nonStriker;s.nonStriker=t}
+    this._checkForWinner();
+  }
 
   startSecondInning(striker,nonStriker,bowler){
     const b1={name:striker,runs:0,ballsFaced:0,fours:0,sixes:0,isOut:false};
@@ -290,6 +298,7 @@ class ScoringEngine {
       const saved={matchId:s.matchId,inning1Runs:s.runs,inning1Wickets:s.wickets,inning1Balls:s.balls,
         inning1BatsmenList:this._dc(s.batsmenList),inning1BowlersList:this._dc(s.bowlersList),
         inning1Byes:s.byes,inning1LegByes:s.legByes,inning1Wides:s.totalWides,inning1NoBalls:s.totalNoBalls,
+        inning1Overthrows:s.overthrows,inning1History:this._dc(s.history),
         team1Name:s.team1Name,team2Name:s.team2Name};
       const overs=s.maxOvers;
       this.state=this._freshState();
@@ -353,14 +362,15 @@ function _buildHistoryEntry(s){
     batsmenList:s.batsmenList,bowlersList:s.bowlersList,
     currentInning:s.currentInning,maxOvers:s.maxOvers,
     inning1Byes:s.inning1Byes,inning1LegByes:s.inning1LegByes,
-    inning1Wides:s.inning1Wides,inning1NoBalls:s.inning1NoBalls,
-    byes:s.byes,legByes:s.legByes,totalWides:s.totalWides,totalNoBalls:s.totalNoBalls
+    inning1Wides:s.inning1Wides,inning1NoBalls:s.inning1NoBalls,inning1Overthrows:s.inning1Overthrows||0,
+    byes:s.byes,legByes:s.legByes,totalWides:s.totalWides,totalNoBalls:s.totalNoBalls,overthrows:s.overthrows||0,
+    history:s.history||[],inning1History:s.inning1History||[]
   };
 }
 
 function syncLiveMatchToHistory(){
   const s=engine.state;
-  if(!s.matchStarted||!s.matchId)return;
+  if((!s.matchStarted&&!s.matchResult)||!s.matchId)return;
   try{
     const hist=JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');
     const entry=_buildHistoryEntry(s);
@@ -395,6 +405,7 @@ function removeLiveMatchFromHistory(){
 function pushToSavedMatches(){
   const s=engine.state;
   if(!s.matchStarted)return;
+  saveState();
   syncLiveMatchToHistory();
   engine.reset();
   clearSavedState();
@@ -408,6 +419,9 @@ function getHistory(){
 const engine = new ScoringEngine();
 let noBallHitByBat = false;
 
+let _saveTimer = null;
+function debouncedSave(){clearTimeout(_saveTimer);_saveTimer=setTimeout(()=>saveState(),1000)}
+
 function $(id){return document.getElementById(id)}
 function show(id){$(id).classList.remove('hidden')}
 function hide(id){$(id).classList.add('hidden')}
@@ -417,7 +431,7 @@ function buzz(ms){if(navigator.vibrate)navigator.vibrate(ms||15)}
 
 function render(){
   const s=engine.state, e=engine;
-  saveState();
+  debouncedSave();
 
   // Header info
   if(s.matchStarted){
@@ -433,13 +447,15 @@ function render(){
   if(!s.matchStarted&&!s.matchResult){
     show('match-setup');hide('live-scoring');hide('match-result');
     if(s.currentInning===2){
-      $('setup-title').textContent='2nd Innings Setup';
+      $('setup-title').textContent='2nd Innings Setup — '+s.team2Name+' need '+((s.inning1Runs+1))+' to win';
       $('setup-team-fields').classList.add('hidden');
       $('btn-match-history').classList.add('hidden');
+      show('setup-inn2-actions');
     } else {
       $('setup-title').textContent='Match Setup';
       $('setup-team-fields').classList.remove('hidden');
       $('btn-match-history').classList.remove('hidden');
+      hide('setup-inn2-actions');
     }
     return;
   }
@@ -450,8 +466,12 @@ function render(){
   }
   hide('match-setup');show('live-scoring');hide('match-result');
 
-  // Prompts
-  if(e.needsNewBatsman){
+  // Prompts — show one at a time: batsman first, then bowler
+  const showBatsmanPrompt=e.needsNewBatsman;
+  const showBowlerPrompt=e.needsNewBowler&&!e.needsNewBatsman;
+  const promptActive=showBatsmanPrompt||showBowlerPrompt;
+  if(promptActive)show('prompt-overlay');else hide('prompt-overlay');
+  if(showBatsmanPrompt){
     show('new-batsman-prompt');$('input-new-batsman').value='';
     const rhList=$('retired-hurt-list');if(rhList)rhList.innerHTML='';
     if(s.retiredHurt&&s.retiredHurt.length>0&&rhList){
@@ -462,7 +482,7 @@ function render(){
       });
     }
   }else hide('new-batsman-prompt');
-  if(e.needsNewBowler){
+  if(showBowlerPrompt){
     show('new-bowler-prompt');$('input-new-bowler').value='';
     const list=$('existing-bowlers-list');list.innerHTML='';
     if(s.bowlersList.length>0){
@@ -472,7 +492,7 @@ function render(){
         btn.onclick=()=>{engine.setNewBowler(b.name);render()};list.appendChild(btn);
       });
     }
-
+    if(s.balls>0&&engine.stateHistory.length>0)show('btn-undo-last-ball');else hide('btn-undo-last-ball');
   } else hide('new-bowler-prompt');
 
   // Score card
@@ -500,6 +520,7 @@ function render(){
   $('btn-noball').disabled=!e.isScoringAllowed;
   $('btn-bye').disabled=!e.isScoringAllowed;
   $('btn-legbye').disabled=!e.isScoringAllowed;
+  $('btn-overthrow').disabled=!e.isScoringAllowed;
 
 
   // Over summary
@@ -518,6 +539,7 @@ function render(){
       case 'noBall':d.classList.add('chip-noball');d.textContent=ev.value>1?'Nb+'+(ev.value-1):'Nb';break;
       case 'bye':d.classList.add('chip-bye');d.textContent='B'+ev.value;break;
       case 'legBye':d.classList.add('chip-legbye');d.textContent='Lb'+ev.value;break;
+      case 'overthrow':d.classList.add('chip-bye');d.textContent='OT'+ev.value;break;
     }
     chips.appendChild(d);
   });
@@ -555,6 +577,34 @@ function renderSummary(){
   renderSummaryFrom(engine.state,engine);
 }
 
+function buildOverSummary(history){
+  if(!history||history.length===0)return[];
+  const overs=[];
+  let legal=0,runs=0,bowler=null;
+  history.forEach(ev=>{
+    const r=ev.value||0;
+    if(ev.type==='overthrow'){runs+=r;return}
+    if(ev.bowler)bowler=ev.bowler;
+    if(ev.type==='wide'||ev.type==='noBall'){runs+=r}
+    else{
+      runs+=ev.type==='wicket'?(ev.runOutRuns||0):r;
+      legal++;
+      if(legal===6){overs.push({over:overs.length+1,bowler:bowler||'?',runs:runs});legal=0;runs=0}
+    }
+  });
+  if(legal>0||runs>0)overs.push({over:overs.length+1,bowler:bowler||'?',runs:runs});
+  return overs;
+}
+
+function oversCard(title,history){
+  const overs=buildOverSummary(history);
+  if(overs.length===0)return'';
+  let h='<div class="summary-section-title">📊 '+title+'</div><div class="summary-card"><table class="summary-table"><thead><tr><th>Over</th><th>Bowler</th><th>Runs</th></tr></thead><tbody>';
+  overs.forEach(o=>{h+='<tr><td>'+o.over+'</td><td>'+o.bowler+'</td><td><b>'+o.runs+'</b></td></tr>'});
+  h+='</tbody></table></div>';
+  return h;
+}
+
 function renderSummaryFrom(s,e,matchDate){
   const both=s.currentInning===2&&s.inning1BatsmenList.length>0;
   const completed=!!s.matchResult;
@@ -588,6 +638,7 @@ function renderSummaryFrom(s,e,matchDate){
     h+=inningsBatCard(s.inning1BatsmenList,null,null,s.inning1Runs,s.inning1Wickets,e.inning1OversDisplay,e.inning1TotalExtras,s.inning1Wides,s.inning1NoBalls,s.inning1Byes,s.inning1LegByes,true);
     h+='<div class="summary-section-title">🎯 Bowling</div>';
     h+=inningsBowlCard(s.inning1BowlersList);
+    h+=oversCard('Over-by-Over — 1st Innings',s.inning1History);
     h+='<div class="summary-section-title">🏏 2nd Innings — '+s.team2Name+'</div>';
   } else {
     h+='<div class="summary-section-title">🏏 Batting</div>';
@@ -595,6 +646,7 @@ function renderSummaryFrom(s,e,matchDate){
   h+=inningsBatCard(s.batsmenList,s.striker,s.nonStriker,s.runs,s.wickets,e.oversDisplay,e.totalExtras,s.totalWides,s.totalNoBalls,s.byes,s.legByes,completed);
   h+='<div class="summary-section-title">🎯 Bowling</div>';
   h+=inningsBowlCard(s.bowlersList);
+  h+=oversCard(both?'Over-by-Over — 2nd Innings':'Over-by-Over',s.history);
 
   if(e.team1Nrr!==null){
     const fmt=n=>(n>=0?'+':'')+n.toFixed(3);
@@ -689,8 +741,8 @@ let _viewingHistoryMatch=null;
 
 function historyMatchData(m){
   const oversDisplay=b=>Math.floor(b/6)+'.'+b%6;
-  const totalExtras=(m.byes||0)+(m.legByes||0)+(m.totalWides||0)+(m.totalNoBalls||0);
-  const inn1TotalExtras=(m.inning1Byes||0)+(m.inning1LegByes||0)+(m.inning1Wides||0)+(m.inning1NoBalls||0);
+  const totalExtras=(m.byes||0)+(m.legByes||0)+(m.totalWides||0)+(m.totalNoBalls||0)+(m.overthrows||0);
+  const inn1TotalExtras=(m.inning1Byes||0)+(m.inning1LegByes||0)+(m.inning1Wides||0)+(m.inning1NoBalls||0)+(m.inning1Overthrows||0);
   return {
     state:{
       team1Name:m.team1,team2Name:m.team2,
@@ -700,9 +752,10 @@ function historyMatchData(m){
       inning1BatsmenList:m.inning1BatsmenList||[],inning1BowlersList:m.inning1BowlersList||[],
       batsmenList:m.batsmenList||[],bowlersList:m.bowlersList||[],
       striker:null,nonStriker:null,
-      byes:m.byes||0,legByes:m.legByes||0,totalWides:m.totalWides||0,totalNoBalls:m.totalNoBalls||0,
+      byes:m.byes||0,legByes:m.legByes||0,totalWides:m.totalWides||0,totalNoBalls:m.totalNoBalls||0,overthrows:m.overthrows||0,
       inning1Byes:m.inning1Byes||0,inning1LegByes:m.inning1LegByes||0,
-      inning1Wides:m.inning1Wides||0,inning1NoBalls:m.inning1NoBalls||0
+      inning1Wides:m.inning1Wides||0,inning1NoBalls:m.inning1NoBalls||0,inning1Overthrows:m.inning1Overthrows||0,
+      history:m.history||[],inning1History:m.inning1History||[]
     },
     oversDisplay:oversDisplay(m.inning2Balls||0),
     inning1OversDisplay:oversDisplay(m.inning1Balls||0),
@@ -817,8 +870,22 @@ document.addEventListener('DOMContentLoaded',()=>{
     btn.onclick=()=>{engine.legBye(parseInt(btn.dataset.lb));hideModal('modal-legbye');render()}
   });
 
+  $('btn-overthrow').onclick=()=>{$('input-overthrow-runs').value='';showModal('modal-overthrow')};
+  $('btn-confirm-overthrow').onclick=()=>{
+    const r=parseInt($('input-overthrow-runs').value);if(!r||r<1)return;
+    engine.overthrow(r);hideModal('modal-overthrow');render();
+  };
+
   // Controls
-  $('btn-undo').onclick=()=>{engine.undoLastBall();render()};
+  $('btn-undo').onclick=()=>{
+    const s=engine.state;
+    if(s.matchStarted&&s.currentBowler&&s.balls%6===0){
+      s.currentBowler=null;
+      render();
+      return;
+    }
+    engine.undoLastBall();render();
+  };
 
   $('btn-push-save').onclick=()=>{pushToSavedMatches();render()};
 
@@ -917,11 +984,20 @@ document.addEventListener('DOMContentLoaded',()=>{
     }
 
     const filename=(s.team1Name+' vs '+s.team2Name).replace(/[^a-zA-Z0-9 ]/g,'')+' - Match Summary.pdf';
-    doc.save(filename);
+    if(window.AndroidPdf){
+      const base64=doc.output('datauristring').split(',')[1];
+      window.AndroidPdf.savePdf(base64,filename);
+    } else {
+      doc.save(filename);
+    }
   };
 
+  // 2nd innings setup actions
+  $('btn-inn2-summary').onclick=()=>{renderSummary();showModal('modal-summary')};
+  $('btn-inn2-undo').onclick=()=>{engine.undoLastBall();render()};
+
   // New match
-  $('btn-new-match').onclick=()=>{engine.reset();clearSavedState();render()};
+  $('btn-new-match').onclick=()=>{engine.reset();clearSavedState();saveState();render()};
 
   // New batsman
   $('btn-confirm-batsman').onclick=()=>{
@@ -934,6 +1010,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     const n=$('input-new-bowler').value.trim();if(!n)return;
     engine.setNewBowler(n);render();
   };
+
+  // Undo last ball from bowler prompt
+  $('btn-undo-last-ball').onclick=()=>{engine.undoLastBall();render()};
 
   // Match history
   $('btn-match-history').onclick=()=>{renderHistory();showModal('modal-history')};

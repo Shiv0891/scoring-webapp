@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#0f1923">
+  <meta name="theme-color" content="#1565c0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Cricket Scorer</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
 </head>
 <body>
 <div id="lock-screen">
@@ -48,6 +48,10 @@
     <input type="text" id="setup-bowler" placeholder="Bowler">
     <button id="btn-start-match" class="btn btn-primary btn-full">Start Match</button>
     <button id="btn-match-history" class="btn btn-secondary btn-full mt-8">📜 Match History</button>
+    <div id="setup-inn2-actions" class="hidden">
+      <button id="btn-inn2-summary" class="btn btn-secondary btn-full mt-8">📋 1st Innings Summary</button>
+      <button id="btn-inn2-undo" class="btn btn-outline btn-full mt-8">↩ Undo Last Ball</button>
+    </div>
   </div>
 
   <!-- Match Result -->
@@ -57,6 +61,9 @@
     <button id="btn-new-match" class="btn btn-primary btn-full mt-12">New Match</button>
     <button id="btn-result-summary" class="btn btn-secondary btn-full mt-8">📋 Summary</button>
   </div>
+
+  <!-- Blocking overlay for prompts -->
+  <div id="prompt-overlay" class="hidden"></div>
 
   <!-- Live Scoring -->
   <div id="live-scoring" class="hidden">
@@ -73,7 +80,7 @@
       <input type="text" id="input-new-bowler" placeholder="Bowler Name">
       <div id="existing-bowlers-list"></div>
       <button id="btn-confirm-bowler" class="btn btn-primary btn-full mt-8">Confirm</button>
-
+      <button id="btn-undo-last-ball" class="btn btn-secondary btn-full mt-8 hidden">↩ Undo Last Ball</button>
     </div>
 
     <div id="score-card" class="card">
@@ -103,6 +110,7 @@
         <button id="btn-noball" class="btn btn-outline">No Ball</button>
         <button id="btn-bye" class="btn btn-outline">Bye</button>
         <button id="btn-legbye" class="btn btn-outline">Leg Bye</button>
+        <button id="btn-overthrow" class="btn btn-outline">Overthrow</button>
       </div>
     </div>
 
@@ -206,6 +214,15 @@
         <button class="btn btn-primary" data-lb="3">+3</button>
         <button class="btn btn-primary" data-lb="4">+4</button>
       </div>
+    </div>
+  </div>
+
+  <div id="modal-overthrow" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h3>Overthrow</h3>
+      <p class="modal-subtitle">Enter number of overthrow runs</p>
+      <input type="number" id="input-overthrow-runs" placeholder="Runs" min="1" max="99">
+      <button id="btn-confirm-overthrow" class="btn btn-primary btn-full mt-8">Confirm</button>
     </div>
   </div>
 
